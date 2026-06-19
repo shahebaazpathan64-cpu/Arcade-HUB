@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arcade Hub - Ultra Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --space-black: #050507;
+            --hull-gray-dark: #12141c;
+            --hull-gray-light: #222533;
+            --starlight-white: #ffffff;
+            --glow-light: rgba(255, 255, 255, 0.85);
+            --hud-gray: #5a6175;
+        }
+
+        /* Smooth Snap Scrolling */
+        html {
+            scroll-behavior: smooth;
+            scroll-snap-type: y mandatory;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Rajdhani', sans-serif;
+            background: var(--space-black);
+            color: #d1d5db;
+            overflow-x: hidden;
+            cursor: none;
+        }
+
+        /* --- INTERACTIVE GLOW CURSOR --- */
+        #custom-cursor {
+            width: 20px;
+            height: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            position: fixed;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 9999;
+            mix-blend-mode: difference;
+            transition: width 0.3s, height 0.3s, background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+        
+        #custom-cursor::after {
+            content: '';
+            width: 4px;
+            height: 4px;
+            background: var(--starlight-white);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #custom-cursor.expand-big {
+            width: 80px;
+            height: 80px;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-color: var(--starlight-white);
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.6), inset 0 0 15px rgba(255, 255, 255, 0.2);
+        }
+
+        #custom-cursor.expand-link {
+            width: 40px;
+            height: 40px;
+            border-color: var(--starlight-white);
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* --- SPACE BACKGROUND CANVAS EFFECT --- */
+        .starfield {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background: radial-gradient(circle at center, #111424 0%, var(--space-black) 70%);
+            background-image: 
+                radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 40px),
+                radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 30px),
+                radial-gradient(white, rgba(255,255,255,.1) 2px, transparent 40px);
+            background-size: 550px 550px, 350px 350px, 250px 250px;
+            background-position: 0 0, 40px 60px, 130px 270px;
+            opacity: 0.4;
+            animation: starDrift 120s linear infinite;
+        }
+
+        @keyframes starDrift {
+            from { background-position: 0 0, 40px 60px, 130px 270px; }
+            to { background-position: 550px 1100px, 400px 760px, 380px 870px; }
+        }
+
+        .hud-grid {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 100px 100px;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        /* --- UI ELEMENTS --- */
+
+        .side-nav {
+            position: fixed;
+            right: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .nav-dot {
+            width: 8px;
+            height: 8px;
+            background: transparent;
+            border-radius: 50%;
+            border: 2px solid var(--hud-gray);
+            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .nav-dot:hover { 
+            background: var(--starlight-white); 
+            border-color: var(--starlight-white);
+            transform: scale(1.4); 
+            box-shadow: 0 0 10px var(--glow-light);
+        }
+
+        .profile-container {
+            position: fixed;
+            top: 30px;
+            right: 40px;
+            text-align: right;
+            text-decoration: none;
+            color: #a3aed0;
+            z-index: 210;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        .profile-circle {
+            width: 45px;
+            height: 45px;
+            background: var(--hull-gray-light);
+            border-radius: 4px;
+            border: 1px solid var(--hud-gray);
+            box-shadow: inset 0 0 10px rgba(255,255,255,0.05);
+            transition: 0.3s;
+            position: relative;
+        }
+        .profile-container:hover .profile-circle {
+            border-color: var(--starlight-white);
+            box-shadow: 0 0 15px rgba(255,255,255,0.2), inset 0 0 5px rgba(255,255,255,0.2);
+            transform: rotate(45deg);
+        }
+        .profile-label {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            color: var(--starlight-white);
+            text-shadow: 0 0 5px rgba(255,255,255,0.3);
+        }
+
+        /* --- SECTIONS --- */
+
+        section {
+            height: 100vh;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            scroll-snap-align: start;
+            position: relative;
+            padding: 0 10%;
+            box-sizing: border-box;
+            z-index: 3;
+            /* Establish local 3D perspective environment for elements inside */
+            perspective: 1000px;
+        }
+
+        .hero h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            font-weight: 400;
+            margin-bottom: 5px;
+        }
+        .hero h3 { 
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(2.5rem, 8vw, 5.5rem); 
+            font-weight: 700;
+            margin: 0;
+            color: var(--starlight-white);
+            text-shadow: 0 0 30px rgba(255, 255, 255, 0.15);
+            letter-spacing: 14px;
+        }
+
+        /* Game Layout */
+        .game-display {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 80px;
+            align-items: center;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        /* --- GLOW AND COMING FRONT IMAGE ANIMATION CONFIGURATION --- */
+        .game-image-container {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #000;
+            border: 1px solid var(--hull-gray-light);
+            border-radius: 0px; 
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.7);
+            
+            /* Preparing structure for the 3D 'bring-forward' and glow movement */
+            transform-style: preserve-3d;
+            transform: translateZ(0px) scale(1);
+            transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1), 
+                        border-color 0.6s cubic-bezier(0.25, 1, 0.5, 1), 
+                        box-shadow 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+            z-index: 5;
+        }
+
+        .game-image-container::before {
+            content: '';
+            position: absolute;
+            top: 10px; left: 10px; width: 15px; height: 15px;
+            border-top: 2px solid rgba(255,255,255,0.3);
+            border-left: 2px solid rgba(255,255,255,0.3);
+            z-index: 6;
+            transition: 0.4s;
+        }
+
+        /* Trigger state when hovering over the parent section block */
+        section:hover .game-image-container {
+            border-color: rgba(255, 255, 255, 0.7);
+            
+            /* Scale up and pop forward out of the screen layout (translateZ) */
+            transform: translateZ(40px) scale(1.04);
+            
+            /* Soft, highly diffused luminous starlight background glow */
+            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.8), 
+                        0 0 50px rgba(255, 255, 255, 0.18);
+        }
+        
+        section:hover .game-image-container::before {
+            border-color: var(--starlight-white);
+            transform: translate(-3px, -3px);
+        }
+
+        .game-image-container img {
+            filter: grayscale(40%) contrast(110%);
+            transform: scale(1);
+            transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1), 
+                        filter 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        
+        section:hover .game-image-container img {
+            filter: grayscale(0%) contrast(100%);
+            transform: scale(1.05); /* Slight secondary inner camera glide */
+        }
+
+        .game-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(1.8rem, 4vw, 3rem);
+            font-weight: 700;
+            color: var(--starlight-white);
+            margin: 0 0 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .game-info p {
+            font-size: 18px;
+            color: #8a92a6;
+            margin-bottom: 30px;
+            letter-spacing: 0.5px;
+        }
+
+        .play-btn {
+            display: inline-block;
+            padding: 15px 45px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 13px;
+            letter-spacing: 3px;
+            color: var(--starlight-white);
+            background: transparent;
+            text-decoration: none;
+            border: 1px solid var(--hud-gray);
+            font-weight: 700;
+            transition: 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            position: relative;
+        }
+
+        .play-btn:hover {
+            color: var(--space-black);
+            background: var(--starlight-white);
+            border-color: var(--starlight-white);
+            box-shadow: 0 0 25px var(--glow-light);
+        }
+
+        .scroll-down {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: telemetryBounce 2.5s infinite;
+            color: var(--hud-gray);
+            font-family: 'Orbitron';
+            font-size: 10px;
+            letter-spacing: 5px;
+        }
+
+        @keyframes telemetryBounce {
+            0%, 20%, 50%, 80%, 100% {transform: translateY(0) translateX(-50%); opacity: 0.5;}
+            40% {transform: translateY(-8px) translateX(-50%); opacity: 1; color: var(--starlight-white);}
+            60% {transform: translateY(-4px) translateX(-50%); opacity: 0.8;}
+        }
+
+        @media (max-width: 900px) {
+            body { cursor: auto; }
+            #custom-cursor { display: none; }
+            .game-display { grid-template-columns: 1fr; gap: 40px; text-align: center !important; }
+            .play-btn { width: 80%; box-sizing: border-box; }
+            .side-nav { display: none; }
+            .profile-container { top: 20px; right: 20px; }
+            .profile-label { display: none; }
+            section:hover .game-image-container { transform: none; box-shadow: none; } /* Disable 3D depth modifications on responsive screens */
+        }
+    </style>
+</head>
+<body>
+
+    <div id="custom-cursor"></div>
+
+    <div class="starfield"></div>
+    <div class="hud-grid"></div>
+
+    <div class="side-nav">
+        <a href="#hero" class="nav-dot"></a>
+        <a href="#game1" class="nav-dot"></a>
+        <a href="#game2" class="nav-dot"></a>
+        <a href="#game3" class="nav-dot"></a>
+        <a href="#game4" class="nav-dot"></a>
+        <a href="#game5" class="nav-dot"></a>
+        <a href="#game6" class="nav-dot"></a>
+    </div>
+
+    <a href="profile.html" class="profile-container">
+        <div class="profile-label">Owner-Shaz</div>
+        <div class="profile-circle"></div>
+    </a>
+
+    <section id="hero" class="hero">
+        <h1 style="color: var(--hud-gray); letter-spacing: 12px;">INITIALIZING SYSTEM...</h1>
+        <h3>ARCADE HUB</h3>
+        <p style="opacity: 0.4; font-family: 'Orbitron'; letter-spacing: 4px; font-size: 13px;">ULTRA EDITION 2026</p>
+        <div class="scroll-down">NAVIGATION ENGAGED</div>
+    </section>
+
+    <section id="game1">
+        <div class="game-display">
+            <div class="game-image-container">
+                <img src="img1.png" alt="Balloon" style="width:100%; height:100%; object-fit:cover;">
+            </div>
+            <div class="game-info">
+                <h2 class="game-title">Cyber Pop</h2>
+                <p>Burst the limits. High-speed precision popping.</p>
+                <a href="cyberpop.html" class="play-btn">DEPLOY</a>
+            </div>
+        </div>
+    </section>
+
+    <section id="game2">
+        <div class="game-display">
+            <div class="game-info" style="text-align: right;">
+                <h2 class="game-title">Hand Tracker</h2>
+                <p>Check Your Hand Animation</p>
+                <a href="handtracker.html" class="play-btn">ANIMATION</a>
+            </div>
+            <div class="game-image-container">
+                <img src="img3.png" alt="OX" style="width:100%; height:100%; object-fit:cover;">
+            </div>
+        </div>
+    </section>
+
+    <section id="game3">
+        <div class="game-display">
+            <div class="game-image-container">
+                <img src="" alt="Whack" style="width:100%; height:100%; object-fit:cover;">
+            </div>
+            <div class="game-info">
+                <h2 class="game-title">XXXXXXXXX</h2>
+                <p>React or fail. The digital moles are coming.</p>
+                <a href="Whack.html" class="play-btn">ENGAGE</a>
+            </div>
+        </div>
+    </section>
+
+    <section id="game4">
+        <div class="game-display">
+            <div class="game-info" style="text-align: right;">
+                <h2 class="game-title">XXXXXXXX</h2>
+                <p>The classic hunger. Redefined in neon.</p>
+                <a href="Snakeclassic.html" class="play-btn">CONSUME</a>
+            </div>
+            <div class="game-image-container">
+                <img src="" alt="Snake" style="width:100%; height:100%; object-fit:cover;">
+            </div>
+        </div>
+    </section>
+
+    <section id="game5">
+        <div class="game-display">
+            <div class="game-image-container">
+                <img src="img4.png" alt="Mystery" style="width:100%; height:100%; object-fit:cover;">
+            </div>
+            <div class="game-info">
+                <h2 class="game-title">Mystery Parda</h2>
+                <h3 style="font-size: 13px; color: var(--hud-gray); font-family: 'Orbitron'; letter-spacing: 2px; margin-top: 0; margin-bottom: 25px;">SHELL GAME</h3>
+                <a href="mystreryparda.html" class="play-btn">UNVEIL</a>
+            </div>
+        </div>
+    </section>
+
+    <section id="game6">
+        <div class="game-display">
+            <div class="game-info" style="text-align: right;">
+                <h2 class="game-title">Truth / Dare</h2>
+                <p>The ultimate social gamble.</p>
+                <a href="truthordare.html" class="play-btn">NUMBER</a>
+            </div>
+            <div class="game-image-container">
+                <img src="img2.png" alt="Dice" style="width:100%; height:100%; object-fit:cover;">
+            </div>
+        </div>
+    </section>
+
+    <section style="background: #020203; box-shadow: inset 0 50px 100px rgba(0,0,0,0.9);">
+        <h2 style="font-family: Orbitron; color: var(--starlight-white); letter-spacing: 6px; font-weight: 400; font-size: 2rem;">CORE SYSTEM READY</h2>
+        <a href="about.html" class="play-btn" style="background: rgba(255,255,255,0.02); border: 1px solid var(--hud-gray); color: #a3aed0;">SYSTEM INFO</a>
+    </section>
+
+    <script>
+        const cursor = document.getElementById('custom-cursor');
+
+        window.addEventListener('mousemove', (e) => {
+            cursor.style.left = e.clientX + 'px';
+            cursor.style.top = e.clientY + 'px';
+        });
+
+        const targetImages = document.querySelectorAll('.game-image-container');
+        targetImages.forEach(imagePanel => {
+            imagePanel.addEventListener('mouseenter', () => {
+                cursor.classList.add('expand-big');
+            });
+            imagePanel.addEventListener('mouseleave', () => {
+                cursor.classList.remove('expand-big');
+            });
+        });
+
+        const interactiveLinks = document.querySelectorAll('.play-btn, .nav-dot, .profile-container');
+        interactiveLinks.forEach(link => {
+            link.addEventListener('mouseenter', () => {
+                cursor.classList.add('expand-link');
+            });
+            link.addEventListener('mouseleave', () => {
+                cursor.classList.remove('expand-link');
+            });
+        });
+    </script>
+</body>
+</html>

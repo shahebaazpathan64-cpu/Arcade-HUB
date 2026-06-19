@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mystery Parda - Space HUD Sound Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Minimal Space Palette matching reference */
+            --space-black: #050507;
+            --hull-gray-dark: #12141c;
+            --hull-gray-light: #222533;
+            --starlight-white: #ffffff;
+            --hud-gray: #5a6175;
+            
+            --gold: #ffd700;
+            --accent: #ff4757;
+            --clue-blue: #00d2ff;
+            --success-green: #00b894;
+        }
+
+        body {
+            margin: 0;
+            overflow-x: hidden;
+            background: var(--space-black);
+            font-family: 'Rajdhani', sans-serif;
+            color: #d1d5db;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        /* --- BACKGROUND & HUD OVERLAYS --- */
+        #bg {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 200%;
+            z-index: -2;
+            background: radial-gradient(circle at center, #111424 0%, var(--space-black) 70%);
+            background-image: 
+                radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 40px),
+                radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 30px),
+                radial-gradient(white, rgba(255,255,255,.1) 2px, transparent 40px);
+            background-size: 550px 550px, 350px 350px, 250px 250px;
+            background-position: 0 0, 40px 60px, 130px 270px;
+            opacity: 0.4;
+            animation: moveSpace 120s linear infinite;
+        }
+        @keyframes moveSpace { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+
+        .hud-grid {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 100px 100px;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* --- UI & HEADERS --- */
+        .header {
+            text-align: center;
+            margin-top: 10px;
+            margin-bottom: 20px;
+            z-index: 10;
+            width: 100%;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2rem;
+            letter-spacing: 4px;
+            margin: 0 0 15px 0;
+            color: var(--starlight-white);
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+        }
+
+        /* Angled Stat Bar Frame for HUD readouts */
+        .header-stats {
+            display: inline-flex;
+            gap: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px 40px;
+            border: 1px solid var(--hud-gray);
+            font-family: 'Orbitron', sans-serif;
+            clip-path: polygon(5% 0, 100% 0, 95% 100%, 0% 100%);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.05);
+            margin-bottom: 15px;
+        }
+
+        .stat-box {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--clue-blue);
+        }
+        #timer-val.warning {
+            color: var(--accent);
+            animation: shake 0.3s infinite;
+        }
+
+        /* Mode Selector Buttons */
+        .difficulty-modes {
+            margin-bottom: 20px;
+            z-index: 10;
+        }
+        .difficulty-modes button {
+            background: transparent;
+            color: #a3aed0;
+            padding: 8px 20px;
+            margin: 0 5px;
+            border: 1px solid var(--hud-gray);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .difficulty-modes button:hover, .difficulty-modes button.active {
+            color: var(--starlight-white);
+            border-color: var(--starlight-white);
+            background: rgba(255, 255, 255, 0.05);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.15);
+        }
+
+        /* Top-Left NAV_HOME Accent */
+        .btn-home {
+            position: absolute; top: 30px; left: 30px; z-index: 210;
+            background: transparent; color: #a3aed0; padding: 12px 25px;
+            border: 1px solid var(--hud-gray);
+            font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 700;
+            letter-spacing: 2px; text-decoration: none;
+            transition: 0.3s; cursor: pointer;
+        }
+        .btn-home:hover {
+            color: var(--starlight-white); border-color: var(--starlight-white);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+        }
+
+        /* --- CLUE DEPLOYMENT DISPLAY --- */
+        #clue-container {
+            background: rgba(18, 20, 28, 0.8);
+            border: 1px solid rgba(90, 97, 117, 0.4);
+            border-left: 4px solid var(--clue-blue);
+            padding: 15px 25px;
+            margin-bottom: 20px;
+            width: 85%;
+            max-width: 600px;
+            text-align: center;
+            box-sizing: border-box;
+            z-index: 5;
+        }
+        .clue-tag {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            color: var(--hud-gray);
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+        #clue-text {
+            font-size: 1.2rem;
+            color: var(--starlight-white);
+            font-weight: 500;
+        }
+
+        /* --- CENTRAL MYSTERY PARDA (BAY DOORS) --- */
+        .mystery-box {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            margin-bottom: 15px;
+            background: var(--space-black);
+            border: 1px solid var(--hud-gray);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 0 30px rgba(0,0,0,0.7);
+            z-index: 5;
+        }
+        
+        /* Shutter/Curtain Overlays */
+        .curtain {
+            position: absolute;
+            top: 0; width: 50.5%; height: 100%;
+            background: var(--hull-gray-light);
+            border: 1px solid rgba(255,255,255,0.05);
+            z-index: 2;
+            transition: transform 0.8s cubic-bezier(0.77, 0, 0.175, 1);
+        }
+        #parda-left { 
+            left: 0; 
+            background-image: linear-gradient(90deg, #181b26, #222533);
+            border-right: 1px solid var(--hud-gray);
+        }
+        #parda-right { 
+            right: 0; 
+            background-image: linear-gradient(270deg, #181b26, #222533);
+            border-left: 1px solid var(--hud-gray);
+        }
+
+        /* Opening Shutter mechanics */
+        .mystery-box.open #parda-left { transform: translateX(-100%); }
+        .mystery-box.open #parda-right { transform: translateX(100%); }
+
+        #revealed-item-display {
+            font-size: 5.5rem;
+            z-index: 1;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+        }
+
+        /* --- CONTROL INFRASTRUCTURE --- */
+        .btn-action {
+            background: transparent;
+            color: var(--starlight-white);
+            padding: 12px 40px;
+            border: 1px solid var(--starlight-white);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+            transition: 0.3s;
+            margin-bottom: 15px;
+            z-index: 10;
+        }
+        .btn-action:hover {
+            box-shadow: 0 0 25px rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        #status-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            letter-spacing: 2px;
+            height: 15px;
+            margin: 5px 0 15px 0;
+            text-transform: uppercase;
+            z-index: 10;
+        }
+
+        /* --- ITEM SELECTION MATRIX GRID --- */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 12px;
+            width: 90%;
+            max-width: 900px;
+            z-index: 5;
+        }
+
+        .item-card {
+            background: rgba(18, 20, 28, 0.7);
+            border: 1px solid rgba(90, 97, 117, 0.3);
+            padding: 15px 10px;
+            cursor: pointer;
+            text-align: center;
+            transition: 0.3s ease;
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            opacity: 0;
+        }
+        .item-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--starlight-white);
+            background: var(--hull-gray-light);
+            box-shadow: 0 5px 15px rgba(255,255,255,0.05);
+        }
+        .item-card.disabled {
+            pointer-events: none;
+            opacity: 0.3 !important;
+        }
+
+        .item-emoji { font-size: 2.2rem; display: block; margin-bottom: 8px; }
+        .item-name { 
+            font-size: 11px; 
+            font-weight: 700; 
+            color: #a3aed0; 
+            text-transform: uppercase; 
+            letter-spacing: 1px;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.8) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(3px); }
+            75% { transform: translateX(-3px); }
+        }
+
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: repeat(4, 1fr); }
+        }
+        @media (max-width: 600px) {
+            .grid { grid-template-columns: repeat(3, 1fr); }
+            .btn-home { position: static; margin-bottom: 15px; display: inline-block; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="bg"></div>
+    <div class="hud-grid"></div>
+
+    <button onclick="location.href='index.html'" class="btn-home">← NAV_HOME</button>
+
+    <div class="header">
+        <h1>SYSTEM_ACCESS: MYSTERY_PARDA</h1>
+        
+        <div class="header-stats">
+            <div class="stat-box">CREDITS: <span id="score-val">0</span></div>
+            <div class="stat-box">CYCLE_TIME: <span id="timer-val">00</span>s</div>
+        </div>
+    </div>
+    
+    <div class="difficulty-modes">
+        <button id="btn-normal" class="active" onclick="setMode(6, 15, 10, 'btn-normal')">NORMAL MATRIX</button>
+        <button id="btn-hard" onclick="setMode(12, 10, 25, 'btn-hard')">HARD MATRIX</button>
+        <button id="btn-legendary" onclick="setMode(24, 7, 60, 'btn-legendary')" style="border-color: var(--accent); color: var(--accent);">LEGENDARY VECTOR</button>
+    </div>
+
+    <button class="btn-action" id="start-btn" onclick="initiateCycle()">INITIATE DEPLOYMENT CYCLE</button>
+
+    <div id="clue-container">
+        <div class="clue-tag">Target_Telemetry_Signature</div>
+        <div id="clue-text">AWAITING CORE INITIALIZATION...</div>
+    </div>
+
+    <div class="mystery-box" id="main-box">
+        <div id="parda-left" class="curtain"></div>
+        <div id="parda-right" class="curtain"></div>
+        <div id="revealed-item-display">?</div>
+    </div>
+
+    <p id="status-text">SYSTEM STANDBY</p>
+
+    <div id="items-grid" class="grid"></div>
+
+    <script>
+        // Web Audio Synth Synthesizer Engine
+        function playTone(freq, type, duration) {
+            try {
+                const context = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = context.createOscillator();
+                const gain = context.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, context.currentTime);
+                gain.gain.setValueAtTime(0.15, context.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(context.destination);
+                osc.start();
+                osc.stop(context.currentTime + duration);
+            } catch(e) { console.log("Audio architecture locked."); }
+        }
+
+        // Expanded, cryptic/difficult dataset
+        const itemList = [
+            { name: "Hourglass", emoji: "⏳", clue: "An isolated desert path leaking silently down a structural choke point." },
+            { name: "Compass", emoji: "🧭", clue: "A loyal iron needle imprisoned in glass, forever pining for a frozen kingdom." },
+            { name: "Mirror", emoji: "🪞", clue: "I mock your actions precisely, yet my orientation remains completely inverted." },
+            { name: "Shadow", emoji: "👤", clue: "Born exclusively of your presence, I lengthen in agony as your energy source dies." },
+            { name: "Map", emoji: "🗺️", clue: "Houses wide open, roaring oceans perfectly dry, cities lacking all vital life signs." },
+            { name: "Echo", emoji: "🗣️", clue: "I am a structural phantom that refuses to speak unless spoken to first." },
+            { name: "Key", emoji: "🔑", clue: "A metal skeleton that gains movement capacity only when biting an ignition core." },
+            { name: "Anchor", emoji: "⚓", clue: "Cast out into absolute darkness when needed; retrieved when fully abandoned." },
+            { name: "Coin", emoji: "🪙", clue: "Equipped with two distinct heads, yet lacking any biological configuration." },
+            { name: "Wind", emoji: "💨", clue: "Completely invisible to optical lenses, yet can scream through valleys." },
+            { name: "Book", emoji: "📖", clue: "Lined with hundreds of leaves but completely unlinked to root structures." },
+            { name: "Gloves", emoji: "🧤", clue: "Engineered with fingers and thumbs, yet completely lacking bone and muscle infrastructure." },
+            { name: "Microscope", emoji: "🔬", clue: "I enlarge micro worlds while blinding half your vision." },
+            { name: "Satellite", emoji: "🛰️", clue: "A metal nomad spinning endlessly inside a void to reflect terrestrial thoughts." },
+            { name: "Black Hole", emoji: "🕳️", clue: "The ultimate gravitation engine where light enters but information breaks." },
+            { name: "Memory", emoji: "🧠", clue: "Captured instantly with zero mechanical hardware, preserved without disk space." },
+            { name: "DNA Helix", emoji: "🧬", clue: "The twisted biological ladder framing code blueprints without silicone." },
+            { name: "Volcano", emoji: "🌋", clue: "A stone chimney breathing sulfur and spitting molten architecture." },
+            { name: "Telescope", emoji: "🔭", clue: "A long barrel designed to capture photons emitted millions of cycles ago." },
+            { name: "Hour Hand", emoji: "⏱️", clue: "Moving with absolute purpose, yet failing to cover ground across a lifetime." },
+            { name: "Lightning", emoji: "⚡", clue: "A flash connection that bridges heaven and earth, instantly frying columns." },
+            { name: "Iceberg", emoji: "🏔️", clue: "A crystalline monolith hiding ninety percent of its true mass underwater." },
+            { name: "Prism", emoji: "💎", clue: "A geometric clean triangular crystal that shards boring light into rainbow arrays." },
+            { name: "Battery", emoji: "🔋", clue: "A chemical battery tank containing terminal conflict between positive and negative poles." }
+        ];
+
+        // Default Config Options
+        let currentConfig = { count: 6, seconds: 15, points: 10 };
+        let winningItem = null;
+        let isGameOver = true; // Block interaction until Start Button is engaged
+        let score = 0;
+        let timer;
+        let timeLeft;
+
+        function setMode(count, seconds, points, btnId) {
+            if(!isGameOver) {
+                alert("Vector matrix busy. Conclude current evaluation run first.");
+                return;
+            }
+            currentConfig = { count, seconds, points };
+            
+            document.querySelectorAll('.difficulty-modes button').forEach(b => b.classList.remove('active'));
+            document.getElementById(btnId).classList.add('active');
+            
+            document.getElementById('timer-val').innerText = seconds.toString().padStart(2, '0');
+        }
+
+        function initiateCycle() {
+            isGameOver = false;
+            clearInterval(timer);
+            timeLeft = currentConfig.seconds;
+
+            // Reset HUD States
+            document.getElementById('main-box').classList.remove('open');
+            document.getElementById('status-text').innerText = "DATA MATCH CYCLING...";
+            document.getElementById('status-text').style.color = "var(--clue-blue)";
+            document.getElementById('revealed-item-display').innerText = "?";
+            document.getElementById('timer-val').innerText = timeLeft.toString().padStart(2, '0');
+            document.getElementById('timer-val').classList.remove('warning');
+
+            // Generate selection matrix subset
+            const shuffled = [...itemList].sort(() => 0.5 - Math.random());
+            const selectedItems = shuffled.slice(0, currentConfig.count);
+            winningItem = selectedItems[Math.floor(Math.random() * currentConfig.count)];
+
+            // Deploy telemetry text
+            document.getElementById('clue-text').innerText = winningItem.clue;
+
+            // Populate Grid matrix
+            const grid = document.getElementById('items-grid');
+            grid.innerHTML = '';
+            selectedItems.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = 'item-card';
+                card.style.animationDelay = `${index * 0.04}s`;
+                card.innerHTML = `<span class="item-emoji">${item.emoji}</span><span class="item-name">${item.name}</span>`;
+                card.onclick = () => handleGuess(item, card);
+                grid.appendChild(card);
+            });
+
+            // Start system sequence timer loop
+            timer = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer-val').innerText = timeLeft.toString().padStart(2, '0');
+
+                if (timeLeft <= 4 && timeLeft > 0) {
+                    document.getElementById('timer-val').classList.add('warning');
+                    playTone(523.25, 'sine', 0.05); // Clean digital ping
+                }
+
+                if (timeLeft <= 0) {
+                    reveal(false, "TEMPORAL TIMEOUT // INTERCEPT FAILED");
+                }
+            }, 1000);
+        }
+
+        function handleGuess(selected, cardElement) {
+            if (isGameOver) return;
+            
+            if (selected.name === winningItem.name) {
+                playTone(880, 'square', 0.25); // Tactical success sound
+                reveal(true, "TARGET SECURED // MATRIX CLEAR");
+            } else {
+                playTone(180, 'sawtooth', 0.4); // Failure feedback chime
+                cardElement.classList.add('disabled'); // Disable incorrectly guessed options
+                reveal(false, `SIGNATURE MISMATCH // IDENTITY: ${winningItem.name}`);
+            }
+        }
+
+        function reveal(isWin, msg) {
+            isGameOver = true;
+            clearInterval(timer);
+
+            document.getElementById('revealed-item-display').innerText = winningItem.emoji;
+            document.getElementById('main-box').classList.add('open');
+
+            const status = document.getElementById('status-text');
+            status.innerText = msg;
+
+            // Freeze any remaining clickable asset parameters
+            document.querySelectorAll('.item-card').forEach(card => card.classList.add('disabled'));
+
+            if (isWin) {
+                score += currentConfig.points;
+                document.getElementById('score-val').innerText = score;
+                status.style.color = "var(--success-green)";
+            } else {
+                status.style.color = "var(--accent)";
+            }
+        }
+    </script>
+</body>
+</html>

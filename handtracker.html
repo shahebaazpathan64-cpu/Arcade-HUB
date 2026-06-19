@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reactive Hand Tracker</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+        #container { position: relative; width: 100vw; height: 100vh; }
+        #input_video { position: absolute; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); visibility: hidden; }
+        #output_canvas { position: absolute; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); z-index: 5; }
+
+        .ui-panel {
+            position: absolute; top: 30px; right: 30px; z-index: 10;
+            display: flex; flex-direction: column; gap: 15px;
+        }
+
+        .btn {
+            background: rgba(0, 0, 0, 0.8); border: 1px solid rgba(255,255,255,0.3);
+            color: #fff; padding: 12px 25px; border-radius: 4px; cursor: pointer;
+            backdrop-filter: blur(10px); transition: 0.3s; font-size: 11px;
+            text-transform: uppercase; letter-spacing: 2px;
+        }
+        .btn:hover { border-color: #fff; background: #fff; color: #000; }
+
+        #hint {
+            position: absolute; bottom: 40px; width: 100%; text-align: center;
+            color: #fff; font-size: 11px; letter-spacing: 3px; z-index: 10;
+            text-shadow: 0 0 10px #000; pointer-events: none;
+        }
+        
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <video id="input_video" playsinline></video>
+        <canvas id="output_canvas"></canvas>
+        
+        <div class="ui-panel">
+            <button class="btn" id="mute-btn" onclick="toggleMute()">AUDIO: ON</button>
+            <button onclick="location.href='index.html'" class="btn-home">← NAV_HOME</button>
+        </div>
+        <div id="hint">OPEN HAND TO SUMMON // PINCH TO EVOLVE // FIST TO DISPEL</div>
+    </div>
+
+<script>
+    const videoElement = document.getElementById('input_video');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const muteBtn = document.getElementById('mute-btn');
+
+    let isMuted = false;
+    let handStates = [
+        { colorIdx: 0, lastPinch: 0 },
+        { colorIdx: 0, lastPinch: 0 }
+    ];
+    
+    const themes = [
+        { name: 'ice', main: '#00fbff', secondary: '#ffffff' },
+        { name: 'lava', main: '#ff3c00', secondary: '#ffe600' },
+        { name: 'planet', main: '#bc00ff', secondary: '#ffea00' }
+    ];
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let oscillators = [null, null];
+    let gains = [null, null];
+
+    function setupAudio(i) {
+        if (oscillators[i]) return;
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = 'sine';
+        g.gain.setValueAtTime(0, audioCtx.currentTime);
+        osc.connect(g);
+        g.connect(audioCtx.destination);
+        osc.start();
+        oscillators[i] = osc;
+        gains[i] = g;
+    }
+
+    function toggleMute() {
+        isMuted = !isMuted;
+        muteBtn.innerText = isMuted ? "AUDIO: OFF" : "AUDIO: ON";
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function onResults(results) {
+        canvasElement.width = window.innerWidth;
+        canvasElement.height = window.innerHeight;
+
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        
+        // Background Camera
+        canvasCtx.globalAlpha = 1.0;
+        canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+        let activeHands = new Set();
+
+        if (results.multiHandLandmarks) {
+            results.multiHandLandmarks.forEach((landmarks, index) => {
+                if (index > 1) return;
+                activeHands.add(index);
+                setupAudio(index);
+
+                const state = handStates[index];
+                const theme = themes[state.colorIdx];
+                
+                // --- FIST DETECTION ---
+                const tips = [8, 12, 16, 20];
+                let distSum = 0;
+                tips.forEach(t => distSum += Math.hypot(landmarks[t].x - landmarks[0].x, landmarks[t].y - landmarks[0].y));
+                const isFist = distSum < 0.65;
+
+                // --- DYNAMIC HAND TRACKER COLOR ---
+                // White if fist (off), Theme color if open (on)
+                const trackerColor = isFist ? '#FFFFFF' : theme.main;
+                drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: trackerColor, lineWidth: 4});
+                drawLandmarks(canvasCtx, landmarks, {color: '#FFFFFF', lineWidth: 1, radius: 2});
+
+                // Pinch to cycle colors
+                const pinchDist = Math.hypot(landmarks[8].x - landmarks[4].x, landmarks[8].y - landmarks[4].y);
+                if (pinchDist < 0.04) {
+                    const now = Date.now();
+                    if (now - state.lastPinch > 800) {
+                        state.colorIdx = (state.colorIdx + 1) % themes.length;
+                        state.lastPinch = now;
+                    }
+                }
+
+                if (!isFist) {
+                    const x = landmarks[9].x * canvasElement.width;
+                    const y = (landmarks[9].y - 0.25) * canvasElement.height; 
+                    const span = Math.hypot(landmarks[4].x - landmarks[20].x, landmarks[4].y - landmarks[20].y) * 900;
+                    const size = Math.max(60, Math.min(span, 190));
+
+                    drawEffect(x, y, size, theme);
+                    updateAudio(index, size, true);
+                } else {
+                    updateAudio(index, 0, false);
+                }
+            });
+        }
+
+        [0, 1].forEach(i => { if (!activeHands.has(i)) updateAudio(i, 0, false); });
+        canvasCtx.restore();
+    }
+
+    function drawEffect(x, y, size, theme) {
+        const time = Date.now() * 0.003;
+        canvasCtx.save();
+        canvasCtx.globalCompositeOperation = 'lighter';
+
+        if (theme.name === 'ice') {
+            const grad = canvasCtx.createRadialGradient(x, y, 0, x, y, size);
+            grad.addColorStop(0, '#fff');
+            grad.addColorStop(0.3, theme.main);
+            grad.addColorStop(1, 'transparent');
+            canvasCtx.fillStyle = grad;
+            canvasCtx.beginPath();
+            canvasCtx.arc(x, y, size, 0, Math.PI * 2);
+            canvasCtx.fill();
+            
+            // Frost lines
+            canvasCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+            for(let i=0; i<6; i++){
+                canvasCtx.beginPath();
+                let r = time + (i * Math.PI/3);
+                canvasCtx.moveTo(x,y);
+                canvasCtx.lineTo(x + Math.cos(r)*size, y + Math.sin(r)*size);
+                canvasCtx.stroke();
+            }
+        } 
+        else if (theme.name === 'planet') {
+            // Shadowed Core
+            const core = canvasCtx.createRadialGradient(x - size/4, y - size/4, 0, x, y, size/1.5);
+            core.addColorStop(0, '#f3d1ff');
+            core.addColorStop(1, '#3a004d');
+            canvasCtx.fillStyle = core;
+            canvasCtx.beginPath();
+            canvasCtx.arc(x, y, size/1.7, 0, Math.PI*2);
+            canvasCtx.fill();
+            // Orbiting Ring
+            canvasCtx.strokeStyle = theme.secondary;
+            canvasCtx.lineWidth = 3;
+            canvasCtx.beginPath();
+            canvasCtx.ellipse(x, y, size, size/2.5, time, 0, Math.PI*2);
+            canvasCtx.stroke();
+        } 
+        else if (theme.name === 'lava') {
+            const p = size * (1 + Math.sin(time*4)*0.1);
+            const grad = canvasCtx.createRadialGradient(x, y, 0, x, y, p);
+            grad.addColorStop(0, '#fff');
+            grad.addColorStop(0.4, '#ffaa00');
+            grad.addColorStop(1, 'transparent');
+            canvasCtx.fillStyle = grad;
+            canvasCtx.beginPath();
+            canvasCtx.arc(x, y, p, 0, Math.PI * 2);
+            canvasCtx.fill();
+            // Embers
+            for(let i=0; i<8; i++) {
+                canvasCtx.fillStyle = '#ff3c00';
+                const ox = Math.sin(time + i) * size;
+                const oy = Math.cos(time + i) * size;
+                canvasCtx.fillRect(x+ox, y+oy, 4, 4);
+            }
+        }
+        canvasCtx.restore();
+    }
+
+    function updateAudio(index, size, active) {
+        if (!gains[index] || isMuted) return;
+        if (active) {
+            oscillators[index].frequency.setTargetAtTime(100 + size, audioCtx.currentTime, 0.1);
+            gains[index].gain.setTargetAtTime(0.05, audioCtx.currentTime, 0.1);
+        } else {
+            gains[index].gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+        }
+    }
+
+    const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+    hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.8, minTrackingConfidence: 0.8 });
+    hands.onResults(onResults);
+
+    const camera = new Camera(videoElement, {
+        onFrame: async () => { await hands.send({image: videoElement}); },
+        width: 1280, height: 720
+    });
+    camera.start();
+
+    window.addEventListener('mousedown', () => audioCtx.resume());
+</script>
+</body>
+</html>

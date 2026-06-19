@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Truth or Dare - Space HUD Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Minimal Space Palette matching reference */
+            --space-black: #050507;
+            --hull-gray-dark: #12141c;
+            --hull-gray-light: #222533;
+            --starlight-white: #ffffff;
+            --hud-gray: #5a6175;
+            
+            --truth-color: #00b894;
+            --dare-color: #d63031;
+            --crosshair-color: #a3aed0;
+        }
+
+        body {
+            margin: 0;
+            overflow-x: hidden;
+            background: var(--space-black);
+            font-family: 'Rajdhani', sans-serif;
+            color: #d1d5db;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        /* --- BACKGROUND & HUD OVERLAYS --- */
+        #bg {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 200%;
+            z-index: -2;
+            background: radial-gradient(circle at center, #111424 0%, var(--space-black) 70%);
+            background-image: 
+                radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 40px),
+                radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 30px),
+                radial-gradient(white, rgba(255,255,255,.1) 2px, transparent 40px);
+            background-size: 550px 550px, 350px 350px, 250px 250px;
+            background-position: 0 0, 40px 60px, 130px 270px;
+            opacity: 0.4;
+            animation: moveSpace 120s linear infinite;
+        }
+        @keyframes moveSpace { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+
+        .hud-grid {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 100px 100px;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* --- UI & HEADERS --- */
+        .header {
+            text-align: center;
+            margin-top: 20px;
+            margin-bottom: 30px;
+            z-index: 10;
+            width: 100%;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2rem;
+            letter-spacing: 4px;
+            margin: 0 0 20px 0;
+            color: var(--starlight-white);
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+        }
+
+        /* Angled Stat Bar Frame for Dice */
+        .stat-bar {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(0,0,0,0.8);
+            padding: 15px 50px;
+            border: 1px solid var(--hud-gray);
+            font-family: 'Orbitron', sans-serif;
+            clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.05);
+            margin-bottom: 20px;
+        }
+
+        .dice-label {
+            color: #a3aed0;
+            font-size: 11px;
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+        }
+
+        .dice-box {
+            color: var(--starlight-white);
+            font-weight: 700;
+            font-size: 36px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        /* Tactical Nav Buttons */
+        .btn-action {
+            background: transparent;
+            color: var(--starlight-white);
+            padding: 12px 35px;
+            border: 1px solid var(--starlight-white);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+            transition: 0.3s;
+            position: relative;
+        }
+        .btn-action:hover:not(:disabled) {
+            box-shadow: 0 0 25px rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .btn-action:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+        .btn-action:disabled {
+            border-color: var(--hud-gray);
+            color: var(--hud-gray);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* Top-Left NAV_HOME */
+        .btn-home {
+            position: absolute; top: 30px; left: 30px; z-index: 210;
+            background: transparent; color: #a3aed0; padding: 12px 25px;
+            border: 1px solid var(--hud-gray);
+            font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 700;
+            letter-spacing: 2px; text-decoration: none;
+            transition: 0.3s;
+            cursor: pointer;
+        }
+        .btn-home:hover {
+            color: var(--starlight-white);
+            border-color: var(--starlight-white);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+        }
+        .btn-home::before, .btn-home::after {
+            content: ''; position: absolute; width: 5px; height: 10px;
+            border: 1px solid var(--starlight-white); transition: 0.3s; opacity: 0;
+        }
+        .btn-home::before { top: 0; left: 0; border-right: 0; border-bottom: 0; }
+        .btn-home::after { bottom: 0; right: 0; border-left: 0; border-top: 0; }
+        .btn-home:hover::before, .btn-home:hover::after { opacity: 1; transform: translate(-3px, -3px); }
+        .btn-home:hover::after { transform: translate(3px, 3px); }
+
+        /* --- GAME LAYOUT GRID --- */
+        .game-board {
+            display: flex;
+            gap: 30px;
+            max-width: 1400px;
+            width: 100%;
+            justify-content: center;
+            z-index: 5;
+            margin-bottom: 5px;
+        }
+
+        .section {
+            flex: 1;
+            background: rgba(18, 20, 28, 0.7);
+            border: 1px solid rgba(90, 97, 117, 0.3);
+            padding: 20px;
+            border-radius: 0px;
+            text-align: center;
+        }
+
+        .section h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            letter-spacing: 3px;
+            margin-top: 0;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr); /* Expanded to fit all 25 perfectly */
+            gap: 12px;
+        }
+
+        /* --- 3D TACTICAL FLIP CARDS --- */
+        .card {
+            width: 100%;
+            height: 90px;
+            perspective: 1000px;
+            transition: opacity 0.5s ease;
+        }
+
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform-style: preserve-3d;
+        }
+
+        .card.is-flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0px;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+
+        .card-front {
+            background-color: var(--hull-gray-light);
+            color: var(--starlight-white);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            border: 1px solid var(--hud-gray);
+        }
+
+        .card-back {
+            font-size: 11px;
+            line-height: 1.25;
+            font-weight: 500;
+            color: #ffffff;
+            transform: rotateY(180deg);
+            border: 1px solid transparent;
+        }
+
+        .truth .card-back {
+            background-color: rgba(0, 184, 148, 0.15);
+            border-color: var(--truth-color);
+            text-shadow: 0 0 5px rgba(0, 184, 148, 0.5);
+        }
+
+        .dare .card-back {
+            background-color: rgba(214, 48, 49, 0.15);
+            border-color: var(--dare-color);
+            text-shadow: 0 0 5px rgba(214, 48, 49, 0.5);
+        }
+
+        /* Spent Card / Exhausted State */
+        .card.is-spent {
+            opacity: 0.25;
+            pointer-events: none;
+        }
+        .card.is-spent .card-front {
+            border-color: transparent;
+            background-color: var(--hull-gray-dark);
+            color: var(--hud-gray);
+        }
+
+        /* Active Lock/Selection Outline Style */
+        .active-roll {
+            outline: 2px solid var(--starlight-white);
+            transform: scale(1.04);
+            z-index: 10;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+        }
+
+        @media (max-width: 1024px) {
+            .grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (max-width: 768px) {
+            .game-board { flex-direction: column; }
+            .btn-home { position: static; margin-bottom: 20px; display: inline-block; }
+            .grid { grid-template-columns: repeat(4, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="bg"></div>
+    <div class="hud-grid"></div>
+
+    <button onclick="location.href='index.html'" class="btn-home">← NAV_HOME</button>
+
+    <div class="header">
+        <h1>SYSTEM_ACCESS: TRUTH_OR_DARE</h1>
+        <div class="stat-bar">
+            <div class="dice-label" id="status-label">TARGET_INDEX</div>
+            <div class="dice-box" id="dice">??</div>
+        </div>
+        <button class="btn-action" id="roll-btn" onclick="playGame()">INITIATE TARGET ROLL</button>
+    </div>
+
+    <div class="game-board">
+        <!-- Truths Left Display Pane -->
+        <div class="section">
+            <h2 style="color: var(--truth-color); text-shadow: 0 0 10px rgba(0, 184, 148, 0.3);">[TRUTH_DATA]</h2>
+            <div class="grid" id="truthGrid"></div>
+        </div>
+
+        <!-- Dares Right Display Pane -->
+        <div class="section">
+            <h2 style="color: var(--dare-color); text-shadow: 0 0 10px rgba(214, 48, 49, 0.3);">[DARE_PARAMS]</h2>
+            <div class="grid" id="dareGrid"></div>
+        </div>
+    </div>
+
+    <script>
+        const truthChallenges = [
+            "What is your most embarrassing classroom story?",
+            "Have you ever completely lied to a professor to get an extension?",
+            "Who is your current secret campus crush?",
+            "What is the absolute lowest grade you have ever received?",
+            "If you could delete one class requirement forever, what would it be?",
+            "What is the weirdest or most questionable object in your dorm?",
+            "Who in this room is most likely to become a self-made millionaire?",
+            "Have you ever secretly cheated on an online or in-person exam?",
+            "What is the longest streak of days you have gone without showering?",
+            "What is your ultimate unironic guilty pleasure pop song?",
+            "Have you ever fallen completely asleep during a live lecture?",
+            "What is the biggest lie you have ever put on your resume?",
+            "Which friend's room or apartment would you never want to live in?",
+            "What is the most irresponsible way you have spent money this semester?",
+            "Have you ever eavesdropped on a conversation not meant for you?",
+            "What is your weirdest personal habit when you are studying alone?",
+            "If you could swap lives with any professor for a week, who is it?",
+            "What is the most ridiculous rumor you have heard about yourself?",
+            "Have you ever forged a signature or document for school?",
+            "What is something you are glad your parents do not know about college?",
+            "Who was your first crush, and how awkward was the situation?",
+            "What is the most childish thing you still do or own?",
+            "Have you ever pretended to be sick to avoid hanging out with someone here?",
+            "What is your biggest fear regarding life post-graduation?",
+            "What is one thing you would change about your major if you could?"
+        ];
+
+        const dareChallenges = [
+            "Perform 10 tactical pushups immediately!",
+            "Text your last crush 'Hi' and put your phone completely away.",
+            "Perform a precise voice impression of your favorite professor.",
+            "Adopt and maintain a British accent for the next 2 complete rounds.",
+            "Allow the player to your right to post an image to your Instagram story.",
+            "Sing the chorus of any random pop song at full volume.",
+            "Dance entirely without music in absolute silence for 30 seconds.",
+            "Wear your socks directly on your hands for the next 10 minutes.",
+            "Attempt to reliably touch your nose using only your tongue.",
+            "Tell a distinct joke—if nobody laughs, perform 5 deep squats.",
+            "Let the group look through your phone's photo library for 20 seconds.",
+            "Do your best runway model walk across the room and back.",
+            "Call a local business or fast food joint and ask if they sell spaceships.",
+            "Drink a custom mystery concoction created by the group (safe ingredients).",
+            "Speak entirely in whispers until your next turn arrives.",
+            "Keep your eyes completely closed until your next action sequence.",
+            "Send a completely random GIF to the fifth contact in your phone list.",
+            "Let someone wrap your arms/torso in plastic wrap or tape for 1 round.",
+            "Give a passionate 1-minute lecture on how to cook perfect instant ramen.",
+            "Try to balance an object chosen by the group on your head for 1 minute.",
+            "Do 15 jumping jacks while loudly stating your favorite cartoon character.",
+            "Reenact an iconic movie scene using dramatic gestures and zero words.",
+            "Allow your neighbor to completely change your smartphone wallpaper.",
+            "Recite the alphabet backward as fast as humanly possible.",
+            "Propose passionately to a nearby inanimate object for 45 seconds."
+        ];
+
+        // Keeps tabs on what cards are still valid targets
+        let remainingCards = [];
+        let currentlySelectedCard = null;
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function initGrids() {
+            const tGrid = document.getElementById('truthGrid');
+            const dGrid = document.getElementById('dareGrid');
+            
+            shuffleArray(truthChallenges);
+            shuffleArray(dareChallenges);
+
+            tGrid.innerHTML = '';
+            dGrid.innerHTML = '';
+            remainingCards = [];
+
+            // Populating all 25 items across numbers 1 to 50
+            // Truth Layout Assignments (Even Coordinates: 2, 4, ... 50)
+            for (let i = 0; i < 25; i++) {
+                const cardNum = (i + 1) * 2;
+                tGrid.innerHTML += createCard(cardNum, 'truth', truthChallenges[i]);
+                remainingCards.push(cardNum);
+            }
+
+            // Dare Layout Assignments (Odd Coordinates: 1, 3, ... 49)
+            for (let i = 0; i < 25; i++) {
+                const cardNum = (i * 2) + 1;
+                dGrid.innerHTML += createCard(cardNum, 'dare', dareChallenges[i]);
+                remainingCards.push(cardNum);
+            }
+        }
+
+        function createCard(num, type, text) {
+            return `
+                <div class="card ${type}" id="card-${num}">
+                    <div class="card-inner">
+                        <div class="card-front">${num.toString().padStart(2, '0')}</div>
+                        <div class="card-back">${text}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function playGame() {
+            // Check if prior card selection needs to be archived as 'spent'
+            if (currentlySelectedCard) {
+                currentlySelectedCard.classList.remove('is-flipped', 'active-roll');
+                currentlySelectedCard.classList.add('is-spent');
+                currentlySelectedCard = null;
+            }
+
+            // Game End Condition Check
+            if (remainingCards.length === 0) {
+                terminateSystem();
+                return;
+            }
+
+            const diceEl = document.getElementById('dice');
+            const rollBtn = document.getElementById('roll-btn');
+            rollBtn.disabled = true; // Lock button during cycle execution
+            
+            let counter = 0;
+            
+            // HUD Matrix scrambling interpolation animation
+            const interval = setInterval(() => {
+                // Flash random coordinates from the absolute global pool for visual effect
+                const fakeNum = Math.floor(Math.random() * 50) + 1;
+                diceEl.innerText = fakeNum.toString().padStart(2, '0');
+                counter++;
+
+                if (counter > 20) {
+                    clearInterval(interval);
+                    
+                    // Pull real target from only remaining valid assets
+                    const targetIndex = Math.floor(Math.random() * remainingCards.length);
+                    const finalNum = remainingCards[targetIndex];
+                    
+                    // Pluck card item from active matrix array loop
+                    remainingCards.splice(targetIndex, 1);
+                    
+                    diceEl.innerText = finalNum.toString().padStart(2, '0');
+                    triggerCard(finalNum);
+                }
+            }, 50);
+        }
+
+        function triggerCard(num) {
+            const selectedCard = document.getElementById(`card-${num}`);
+            if (selectedCard) {
+                currentlySelectedCard = selectedCard;
+                selectedCard.classList.add('active-roll');
+                
+                setTimeout(() => {
+                    selectedCard.classList.add('is-flipped');
+                    // Unlock target deployment engine for next cycle sequence if array holds data
+                    if (remainingCards.length > 0) {
+                        document.getElementById('roll-btn').disabled = false;
+                    } else {
+                        // Delay terminal screen print to allow current dare reading frame
+                        setTimeout(terminateSystem, 5000);
+                    }
+                }, 500);
+            }
+        }
+
+        function terminateSystem() {
+            document.getElementById('status-label').innerText = "MATRIX_STATUS";
+            document.getElementById('dice').innerText = "END";
+            document.getElementById('dice').style.color = "var(--dare-color)";
+            
+            const rollBtn = document.getElementById('roll-btn');
+            rollBtn.innerText = "SYSTEM TERMINATED";
+            rollBtn.disabled = true;
+
+            if (currentlySelectedCard) {
+                currentlySelectedCard.classList.remove('is-flipped', 'active-roll');
+                currentlySelectedCard.classList.add('is-spent');
+            }
+            alert("All Truth or Dare parameters have been completely exhausted. Game Over.");
+        }
+
+        // Initialize board parameters
+        initGrids();
+    </script>
+</body>
+</html>
